@@ -8,6 +8,7 @@ import (
 
 	"test-fullstack-loyalty/backend/consts"
 	"test-fullstack-loyalty/backend/model"
+	"test-fullstack-loyalty/backend/msgQueue"
 	"test-fullstack-loyalty/backend/riderOps"
 	"test-fullstack-loyalty/backend/store"
 
@@ -73,15 +74,15 @@ func main() {
 
 	// Prepare connection to message queue
 	// msgChan serves to receive message from message queue
-	queueConn, err := NewQueueConn(*amaqAddr)
+	queueConn, err := msgQueue.NewQueueConn(*amaqAddr)
 	if err != nil {
 		log.Fatalf("Fail to connect to %s ", *amaqAddr)
 	}
-	ch, err := QueueChan(queueConn)
+	ch, err := msgQueue.QueueChan(queueConn)
 	if err != nil {
 		log.Fatalf("Fail to create channel to %s ", *amaqAddr)
 	}
-	msgChan, err := Bind(ch, ROUTING_KEY, consts.EXCHANGE)
+	msgChan, err := msgQueue.Bind(ch, ROUTING_KEY, consts.EXCHANGE)
 	if err != nil {
 		log.Fatalf("Fail to connect to rabbit mq @ %s", *amaqAddr)
 	}
