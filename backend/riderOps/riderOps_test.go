@@ -32,7 +32,7 @@ func TestRiderOperation(t *testing.T) {
 		t.Errorf("[Fail] Fail to getRider %v with key %s", err, riderIdStr)
 	}
 	if rider.Id != riderId || rider.Name != riderName || rider.Grade != "BRONZE" {
-		t.Errorf("[Fail] Wrong data retrieved with key %s, %v", riderIdStr, rider)
+		t.Errorf("[Fail] Wrong data retrieved with key %s, %+v", riderIdStr, rider)
 	}
 
 	var rideComplete = model.Payload{

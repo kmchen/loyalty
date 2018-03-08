@@ -17,11 +17,15 @@ type RiderOps interface {
 	RiderSignUp(data model.Payload) (string, error)
 	CreateRide(data model.Payload) (string, error)
 	GetRider(key string) (*model.Rider, error)
+	CompleteRide(data model.Payload) (string, error)
 }
+
 type RiderOperation struct {
 	store       store.Store
 	riderPusher chan model.Rider
 }
+
+type LoyaltyUpdateFunc func(model.Rider, float32) model.Rider
 
 func NewRiderOps(store store.Store, riderPusher chan model.Rider) *RiderOperation {
 	if store == nil || riderPusher == nil {
@@ -33,6 +37,8 @@ func NewRiderOps(store store.Store, riderPusher chan model.Rider) *RiderOperatio
 
 // RiderSignUp create rider with key riderId:timestamp:key
 func (ops *RiderOperation) RiderSignUp(data model.Payload) (string, error) {
+	defer monitoring.RiderTotalReceived.Inc()
+
 	// key in format riderId:timestamp:user
 	key := genKey(data.Id, "user")
 
@@ -73,6 +79,9 @@ func (ops *RiderOperation) GetRider(key string) (*model.Rider, error) {
 
 // createRide creates a ride
 func (ops *RiderOperation) CreateRide(data model.Payload) (string, error) {
+
+	defer monitoring.RideCreatedReceived.Inc()
+
 	var err error
 	// key is in the format of riderId:timestamp:created
 	key := genKey(data.RiderId, "created")
@@ -86,6 +95,9 @@ func (ops *RiderOperation) CreateRide(data model.Payload) (string, error) {
 
 // CompleteRide completes a ride, update loyalty and push to frontend
 func (ops *RiderOperation) CompleteRide(data model.Payload) (string, error) {
+
+	defer monitoring.RideCompleteReceived.Inc()
+
 	var err error
 	var rider *model.Rider
 
@@ -95,11 +107,16 @@ func (ops *RiderOperation) CompleteRide(data model.Payload) (string, error) {
 		return "", err
 	}
 
+	// Update loyalty
 	var keyStr = strconv.FormatInt(data.RiderId, 10)
-	if rider, err = ops.updateLoyalty(keyStr, data.Amount); err != nil {
+	if rider, err = ops.updateLoyalty(keyStr, data.Amount, loyaltyCalculation); err != nil {
 		log.Printf("[Error] Fail to update loyalty %v", err)
 		return "", err
 	}
+
+	monitoring.RideComplete.Inc()
+
+	// Live update rider info to the frontend
 	ops.riderPusher <- *rider
 	return key, nil
 }
@@ -118,36 +135,53 @@ func (ops *RiderOperation) newRide(data model.Payload, key string) error {
 	return nil
 }
 
+// loyaltyCalculation update loyalty logic
+func loyaltyCalculation(rider model.Rider, amount float32) model.Rider {
+	rider.NumRides = rider.NumRides + 1
+	if rider.NumRides < 20 {
+		rider.Loyalty = rider.Loyalty + amount
+	} else if rider.NumRides < 50 {
+		rider.Loyalty = rider.Loyalty + amount*3
+		if rider.NumRides == 20 {
+			rider.Grade = "SILVER"
+			monitoring.NumSilverRider.Inc()
+			monitoring.NumBronzeRider.Dec()
+		}
+	} else if rider.NumRides < 100 {
+		rider.Loyalty = rider.Loyalty + amount*5
+		if rider.NumRides == 50 {
+			rider.Grade = "GOLD"
+			monitoring.NumGoldRider.Inc()
+			monitoring.NumSilverRider.Dec()
+		}
+	} else {
+		rider.Loyalty = rider.Loyalty + amount*10
+		if rider.NumRides == 100 {
+			rider.Grade = "PLATINUM"
+			monitoring.NumPlatinumRider.Inc()
+			monitoring.NumGoldRider.Dec()
+		}
+	}
+	return rider
+}
+
 // updateLoyalty updates loyalty, grade and num of rides
-func (ops *RiderOperation) updateLoyalty(key string, amount float32) (*model.Rider, error) {
+func (ops *RiderOperation) updateLoyalty(key string, amount float32, updateRider LoyaltyUpdateFunc) (*model.Rider, error) {
 	rider, err := ops.GetRider(key)
 	if err != nil {
 		log.Printf("Fail to get Rider with key %s", key)
 		return nil, err
 	}
 
-	// Loyalty update logic
-	rider.NumRides = rider.NumRides + 1
-	if rider.NumRides < 20 {
-		rider.Loyalty = rider.Loyalty + amount
-	} else if rider.NumRides < 50 {
-		rider.Loyalty = rider.Loyalty + amount*3
-		rider.Grade = "SILVER"
-	} else if rider.NumRides < 100 {
-		rider.Loyalty = rider.Loyalty + amount*5
-		rider.Grade = "GOLD"
-	} else {
-		rider.Loyalty = rider.Loyalty + amount*10
-		rider.Grade = "PLATINUM"
-	}
+	updatedRider := updateRider(*rider, amount)
 
 	// Update loyalty
-	var riderIdStr = strconv.FormatInt(rider.Id, 10)
+	var riderIdStr = strconv.FormatInt(updatedRider.Id, 10)
 	riderKey, _ := ops.getRiderKey(riderIdStr)
-	if err := ops.store.Set(riderKey, rider); err != nil {
+	if err := ops.store.Set(riderKey, updatedRider); err != nil {
 		return nil, err
 	}
-	return rider, nil
+	return &updatedRider, nil
 }
 
 // genKey generates key as riderId:timestamp:suffix
