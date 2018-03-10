@@ -1,9 +1,12 @@
 version: '3'
 services:
-  prometheus:
-    image: "prom/prometheus:latest"
-    ports:
-     - "9090:9090"
+  #prometheus:
+    #image: "prom/prometheus"
+    #volumes:
+      #- /Users/kuangmingchen/project/go/src/test-fullstack-loyalty/prometheus.yml:/etc/prometheus/prometheus
+    #command: "--config.file=/etc/prometheus/prometheus.yml"
+    #ports:
+     #- "9090:9090"
   redis:
     image: "redis:alpine"
     ports:

@@ -60,6 +60,7 @@ func (ops *RiderOperation) RiderSignUp(data model.Payload) (string, error) {
 			return "", err
 		}
 		monitoring.RiderTotal.Inc()
+		monitoring.NumBronzeRider.Inc()
 	} else {
 		log.Printf("Duplicate rider sign up %v", data.Id)
 	}

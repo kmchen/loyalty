@@ -13,7 +13,7 @@ import (
 	"test-fullstack-loyalty/backend/store"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/streadway/amqp"
 )
 
@@ -21,7 +21,7 @@ var amaqAddr = flag.String("amaqAddr", "amqp://guest:guest@localhost:5672/", "am
 var wsPort = flag.String("wsPort", ":3000", "wesocket port")
 var redisPort = flag.String("redisPort", ":6379", "redis port")
 var riderChanSize = flag.Int("riderChanSize", 10, "rider channel size")
-var serverAddr = flag.String("serverAddr", "localhost:6061", "server address")
+var serverAddr = flag.String("serverAddr", "localhost:9090", "server address")
 
 var ROUTING_KEY []string = []string{
 	"rider.signup",
@@ -32,12 +32,13 @@ var ROUTING_KEY []string = []string{
 
 func listenFromProducer(msgChan <-chan amqp.Delivery, ops *riderOps.RiderOperation) {
 	for msg := range msgChan {
-		//log.Printf(" [x] %s", d.Body)
+		//log.Printf(" [x] %s", msg.Body)
 		rideData := model.RideData{}
 		err := json.Unmarshal(msg.Body, &rideData)
 		if err != nil {
 			log.Println("Fail to unmarshal data: ", err)
 		}
+
 		switch rideData.Type {
 		case consts.RIDER_SIGNED_UP:
 			ops.RiderSignUp(rideData.Payload)
@@ -91,7 +92,7 @@ func main() {
 	go listenFromProducer(msgChan, ops)
 
 	// Enable metrics monitoring
-	http.Handle("/metrics", prometheus.Handler())
+	http.Handle("/metrics", promhttp.Handler())
 
 	log.Fatal(http.ListenAndServe(*serverAddr, nil))
 }
