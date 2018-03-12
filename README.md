@@ -20,12 +20,12 @@ $ godoc -http=:6060
 $ Visit http://localhost:6060/pkg/test-fullstack-loyalty/backend/
 ```
 
-### monitoring
+### Monitoring
 
 ```sh
 $ Make sure backend is up and running
 $ Visit http://localhost:6061/metrics
-$ Please visit http://localhost:6060/pkg/test-fullstack-loyalty/backend/monitoring/ for more informatoin about metrics
+$ visit http://localhost:6060/pkg/test-fullstack-loyalty/backend/monitoring/ for more information about metrics
 ```
 
 ## Loyalty Frontent

@@ -10,7 +10,7 @@ export default ({ text, username, handleTextChange }) => (
                       <input
                         type="text"
                         value={text}
-                        placeholder="Please enter user id here ...."
+                        placeholder="Please enter rider id here ...."
                         className="form-control"
                         onChange={handleTextChange}
                         onKeyDown={handleTextChange}
